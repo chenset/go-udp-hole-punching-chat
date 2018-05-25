@@ -5,7 +5,7 @@
 ## Start chat server
 
 ```go
-go run server/main.go
+go run server/main.go [ip:port]
 ```
 
 ## Start chat client

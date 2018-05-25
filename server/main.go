@@ -7,9 +7,8 @@ import (
     "log"
     "encoding/json"
     "fmt"
+    "os"
 )
-
-var userIP map[string]string
 
 type ChatRequest struct {
     Action string
@@ -79,45 +78,52 @@ func (self *UDPChatServer) handleClient(conn *net.UDPConn) {
 }
 
 func (self *UDPChatServer) onChatRequestActionIsNew(request ChatRequest, addr *net.UDPAddr) {
-        remoteAddr := fmt.Sprintf("%s:%d", addr.IP, addr.Port)
-        fmt.Println(remoteAddr, "connecting")
-        self.userIP[request.Username] = remoteAddr
+    remoteAddr := fmt.Sprintf("%s:%d", addr.IP, addr.Port)
+    fmt.Println(remoteAddr, "connecting")
+    self.userIP[request.Username] = remoteAddr
 
-        messageRequest := ChatRequest{
-            "Chat",
-            request.Username,
-            remoteAddr,
-        }
-        jsonRequest, err := json.Marshal(&messageRequest)
-        if err != nil {
-            log.Print(err)
-        }
-        self.connection.WriteToUDP(jsonRequest, addr)
+    messageRequest := ChatRequest{
+        "Chat",
+        request.Username,
+        remoteAddr,
+    }
+    jsonRequest, err := json.Marshal(&messageRequest)
+    if err != nil {
+        log.Print(err)
+    }
+    self.connection.WriteToUDP(jsonRequest, addr)
 }
 
 func (self *UDPChatServer) onChatRequestActionIsGet(request ChatRequest, addr *net.UDPAddr) {
-        peerAddr := ""
-        if _, ok := self.userIP[request.Message]; ok {
-            peerAddr = self.userIP[request.Message]
-        }
+    peerAddr := ""
+    if _, ok := self.userIP[request.Message]; ok {
+        peerAddr = self.userIP[request.Message]
+    }
 
-        messageRequest := ChatRequest{
-            "Chat",
-            request.Username,
-            peerAddr,
-        }
-        jsonRequest, err := json.Marshal(&messageRequest)
-        if err != nil {
-            log.Print(err)
-        }
-        _, err = self.connection.WriteToUDP(jsonRequest, addr)
-        if err != nil {
-            log.Print(err)
-        }
-}
+    messageRequest := ChatRequest{
+        "Chat",
+        request.Username,
+        peerAddr,
+    }
+    jsonRequest, err := json.Marshal(&messageRequest)
+    if err != nil {
+        log.Print(err)
+    }
+    _, err = self.connection.WriteToUDP(jsonRequest, addr)
+    if err != nil {
+        log.Print(err)
+    }
+    }
 
 func main() {
-    server := NewUDPChatServer(":9999")
+    var serverHost string
+    if len(os.Args) == 2 {
+        serverHost = os.Args[1]
+    } else {
+        serverHost = ":9999"
+    }
+
+    server := NewUDPChatServer(serverHost)
     server.listen()
 }
 
