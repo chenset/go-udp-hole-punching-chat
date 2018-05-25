@@ -4,13 +4,13 @@
 
 ## Start chat server
 
-```go
+```bash
 go run server/main.go [ip:port]
 ```
 
 ## Start chat client
 
-```go
+```bash
 go run client/main.go <port> <server ip:port> <username> <peername>
 ```
 

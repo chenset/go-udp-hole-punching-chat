@@ -23,6 +23,8 @@ type UDPChatClient struct {
     peername string
     buffer []byte
     connection *net.UDPConn
+    retries int
+    waitForRetry time.Duration
 }
 
 func NewUDPChatClient(port string, server string, username string, peername string) *UDPChatClient {
@@ -48,6 +50,9 @@ func NewUDPChatClient(port string, server string, username string, peername stri
 
     client.buffer = make([]byte, 2048)
 
+    client.retries = 60
+    client.waitForRetry = 1
+
     client.connection, err = net.ListenUDP("udp", client.addr)
     if err != nil {
         log.Print("Listen UDP failed.")
@@ -55,7 +60,10 @@ func NewUDPChatClient(port string, server string, username string, peername stri
     }
 
     client.connectToServer()
-    client.getPeerAddress(peername)
+    client.peerAddr, err = client.getPeerAddress(peername)
+    if err != nil {
+        log.Fatal(err)
+    }
 
     return client
 }
@@ -85,7 +93,7 @@ func (self *UDPChatClient) connectToServer() {
     }
 }
 
-func (self *UDPChatClient) getPeerAddress(peername string) *net.UDPAddr {
+func (self *UDPChatClient) getPeerAddress(peername string) (*net.UDPAddr, error) {
     connectChatRequest := ChatRequest{
         "Get",
         self.username,
@@ -98,7 +106,7 @@ func (self *UDPChatClient) getPeerAddress(peername string) *net.UDPAddr {
     }
 
     var serverResponse ChatRequest
-    for i := 0; i < 3; i++ {
+    for i := 0; i < self.retries; i++ {
         self.connection.WriteToUDP(jsonRequest, self.serverAddr)
         n, _, err := self.connection.ReadFromUDP(self.buffer)
         if err != nil {
@@ -113,20 +121,20 @@ func (self *UDPChatClient) getPeerAddress(peername string) *net.UDPAddr {
         if serverResponse.Message != "" {
             break
         }
-        time.Sleep(10 * time.Second)
+        time.Sleep(self.waitForRetry * time.Second)
     }
 
     if serverResponse.Message == "" {
         log.Fatal("Cannot get peer's address")
     }
     log.Print("Peer ", peername, " address: ", serverResponse.Message)
-    self.peerAddr, err = net.ResolveUDPAddr("udp4", serverResponse.Message)
+    peerAddr, err := net.ResolveUDPAddr("udp4", serverResponse.Message)
     if err != nil {
         log.Print("Resolve peer addres failed.")
         log.Fatal(err)
     }
 
-    return self.peerAddr
+    return peerAddr, err
 }
 
 func (self *UDPChatClient) start() {
@@ -135,40 +143,55 @@ func (self *UDPChatClient) start() {
     self.handleInput()
 }
 
+func (self *UDPChatClient) sendMessage(message string, username string) {
+    messageRequest := ChatRequest{
+        "Chat",
+        username,
+        message,
+    }
+    jsonRequest, err := json.Marshal(messageRequest)
+    if err != nil {
+        log.Print("Error: ", err)
+        return
+    }
+    self.connection.WriteToUDP(jsonRequest, self.peerAddr)
+}
+
 func (self *UDPChatClient) handleInput() {
     for {
         fmt.Print("Input message: ")
         message := make([]byte, 2048)
         fmt.Scanln(&message)
-        messageRequest := ChatRequest{
-            "Chat",
-            self.username,
-            string(message),
-        }
-        jsonRequest, err := json.Marshal(messageRequest)
-        if err != nil {
-            log.Print("Error: ", err)
-            continue
-        }
-        self.connection.WriteToUDP(jsonRequest, self.peerAddr)
+        self.sendMessage(string(message), self.username)
     }
+}
+
+func (self *UDPChatClient) recvMessage() (ChatRequest, error) {
+    buffer := make([]byte, 2048)
+    n, _, err := self.connection.ReadFromUDP(buffer)
+    if err != nil {
+        log.Print(err)
+        return ChatRequest{}, err
+    }
+
+    var message ChatRequest
+    err = json.Unmarshal(buffer[:n], &message)
+    if err != nil {
+        log.Print(err)
+        return ChatRequest{}, err
+    }
+
+    return message, nil
 }
 
 func (self *UDPChatClient) listen(conn *net.UDPConn) {
     for {
-        self.buffer = make([]byte, 2048)
-        n, _, err := conn.ReadFromUDP(self.buffer)
+        message, err := self.recvMessage()
         if err != nil {
             log.Print(err)
             continue
         }
 
-        var message ChatRequest
-        err = json.Unmarshal(self.buffer[:n], &message)
-        if err != nil {
-            log.Print(err)
-            continue
-        }
         fmt.Println("\n", message.Username, ":", message.Message)
         fmt.Print("Input message: ")
     }
