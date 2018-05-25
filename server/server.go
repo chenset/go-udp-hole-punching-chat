@@ -1,13 +1,10 @@
-package main
-
-// https://gist.github.com/reterVision/33a72d70194d4a3c272e
+package server
 
 import (
     "net"
     "log"
     "encoding/json"
     "fmt"
-    "os"
 )
 
 type ChatRequest struct {
@@ -35,7 +32,7 @@ func NewUDPChatServer(port string) *UDPChatServer {
     return server
 }
 
-func (self *UDPChatServer) listen() {
+func (self *UDPChatServer) Listen() {
     log.Print("Start server")
 
     conn, err := net.ListenUDP("udp", self.udpAddr)
@@ -113,17 +110,5 @@ func (self *UDPChatServer) onChatRequestActionIsGet(request ChatRequest, addr *n
     if err != nil {
         log.Print(err)
     }
-    }
-
-func main() {
-    var serverHost string
-    if len(os.Args) == 2 {
-        serverHost = os.Args[1]
-    } else {
-        serverHost = ":9999"
-    }
-
-    server := NewUDPChatServer(serverHost)
-    server.listen()
 }
 

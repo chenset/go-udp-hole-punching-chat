@@ -5,12 +5,16 @@
 ## Start chat server
 
 ```bash
-go run server/main.go [ip:port]
+go run server.go [ip:port]
 ```
 
 ## Start chat client
 
 ```bash
-go run client/main.go <port> <server ip:port> <username> <peername>
+go run client.go <port> <server ip:port> <username> <peername>
 ```
+
+## References
+
+1. [Peer-to-Peer Communication Across Network Address Translators](https://www.usenix.org/legacy/event/usenix05/tech/general/full_papers/ford/ford.pdf)
 
